@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Fog City TV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="room">
+  <div id="tv">
+    <div id="screen-wrap">
+      <div id="stage">
+        <!-- channels mount here -->
+        <div id="power-screen" class="layer">
+          <div class="power-inner">
+            <div class="power-logo">FOG CITY TV</div>
+            <div class="power-hint">Press <b>OK</b> (Enter) or click to turn on</div>
+          </div>
+        </div>
+        <div id="osd" class="osd hidden"></div>
+        <div id="crt-on" class="layer"></div>
+      </div>
+    </div>
+    <div id="tv-led"></div>
+  </div>
+  <div id="remote" aria-label="Remote control">
+    <button data-key="Power" class="r-power" title="Power (P)">&#x23FB;</button>
+    <button data-key="Home" class="r-home" title="Home (H)">HOME</button>
+    <div class="r-dpad">
+      <button data-key="ArrowUp" class="r-up" title="Up">&#9650;</button>
+      <button data-key="ArrowLeft" class="r-left" title="Left">&#9664;</button>
+      <button data-key="Enter" class="r-ok" title="OK (Enter)">OK</button>
+      <button data-key="ArrowRight" class="r-right" title="Right">&#9654;</button>
+      <button data-key="ArrowDown" class="r-down" title="Down">&#9660;</button>
+    </div>
+    <div class="r-row">
+      <button data-key="Back" title="Back (Esc)">BACK</button>
+      <button data-key="Mute" title="Mute (M)">MUTE</button>
+    </div>
+    <div class="r-row">
+      <button data-key="VolDown" title="Volume down (-)">VOL &minus;</button>
+      <button data-key="VolUp" title="Volume up (+)">VOL +</button>
+    </div>
+    <div class="r-row">
+      <button data-key="Fullscreen" title="Full screen (F)">FULL</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
