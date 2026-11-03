@@ -58,6 +58,9 @@ The local server listens only on your own computer (127.0.0.1). It won't serve t
 
 ## Step 3 (optional): use it on the public GitHub Pages site
 
+This repo's site already uses a Worker at `https://fog-city-talk.az9713.workers.dev`, deployed with [`worker/wrangler.toml`](../worker/wrangler.toml). The quickest way to redeploy from a terminal is in the `worker` folder: `npx wrangler login`, `npx wrangler deploy`, then `npx wrangler secret put ANTHROPIC_API_KEY` and `npx wrangler secret put PASSCODE`. The login page's button is **Authorize**, and it waits only a minute or two. The steps below do the same in the Cloudflare dashboard.
+
+
 1. Create a free account at [dash.cloudflare.com](https://dash.cloudflare.com).
 2. Go to **Workers & Pages**, create a Worker from the **Hello World** template, and deploy it. Then click **Edit code**, replace everything with the contents of [`worker/worker.js`](../worker/worker.js), and deploy again.
 3. In the Worker's **Settings > Variables and Secrets**, add:
