@@ -4,6 +4,8 @@
 
 ### [Play it now: az9713.github.io/fog-city-tv](https://az9713.github.io/fog-city-tv/)
 
+**How it was built:** [the development journey, as a web page](https://az9713.github.io/fog-city-tv/docs/journey.html). It covers the first prompt to the Cloudflare Worker, the tech stack, every dependency, the graphics, the APIs, how Cloudflare works, and the unknown unknowns.
+
 Press **Enter** (or click the screen) to power on, then **F** for full screen. Turn your sound on.
 
 ![Home screen](docs/screenshots/home.jpg)
@@ -116,7 +118,7 @@ In the Fireplace and Gallery, **OK** opens that channel's menu.
 - **Sound:** everything is synthesized with the Web Audio API: an FM electric piano, walking bass and brushes for the jazz, and Poisson-process crackles for the fire. The announcer uses the browser's speech synthesis.
 - **Media:** the photoreal sky cam and fireplace were generated once with [fal](https://fal.ai) (Nano Banana Pro and Kling 3.0 Pro) for **about $3.10 in total**.
 
-The whole story is in **[docs/JOURNEY.md](docs/JOURNEY.md)**. It covers the APIs, open-source resources, how the radar map and every graphic were made, the fireplace loop, fal prompts and costs, the bugs found in live testing, and the Windows requirements.
+The whole story is on the **[development journey page](https://az9713.github.io/fog-city-tv/docs/journey.html)** (source: [docs/journey.html](docs/journey.html)), with more detail in **[docs/JOURNEY.md](docs/JOURNEY.md)**. It covers the APIs, open-source resources, how the radar map and every graphic were made, the fireplace loop, fal prompts and costs, the bugs found in live testing, and the Windows requirements.
 
 ## Tests
 

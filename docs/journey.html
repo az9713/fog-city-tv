@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fog City TV Journey</title>
+<meta name="description" content="How Fog City TV was built, from the first prompt to the Cloudflare Worker: tech stack, dependencies, graphics, APIs, Cloudflare, and the unknown unknowns.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f4ef; --surface: #ffffff; --surface-2: #efece4; --ink: #1d2130; --ink-2: #4a5063; --ink-3: #6f7587;
+  --line: #ddd8cc; --accent: #1d5fd1; --accent-ink: #ffffff; --warm: #d9661f; --good: #1f8a55; --warn: #b5541a;
+  --code-bg: #f1eee6; --hero-a: #10204a; --hero-b: #2b4ea2; --hero-ink: #f4f6ff; --shadow: 0 1px 2px rgba(20,24,40,.06), 0 6px 24px rgba(20,24,40,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218; --surface: #171b24; --surface-2: #1d2230; --ink: #e8eaf1; --ink-2: #b4bacb; --ink-3: #8a91a5;
+    --line: #2a3142; --accent: #7aa7ff; --accent-ink: #0f1218; --warm: #f0904e; --good: #5fd39a; --warn: #f0a46a;
+    --code-bg: #1b2030; --hero-a: #0a1430; --hero-b: #1b3478; --hero-ink: #eef1ff; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 24px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1218; --surface: #171b24; --surface-2: #1d2230; --ink: #e8eaf1; --ink-2: #b4bacb; --ink-3: #8a91a5;
+  --line: #2a3142; --accent: #7aa7ff; --accent-ink: #0f1218; --warm: #f0904e; --good: #5fd39a; --warn: #f0a46a;
+  --code-bg: #1b2030; --hero-a: #0a1430; --hero-b: #1b3478; --hero-ink: #eef1ff; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 24px rgba(0,0,0,.25);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-underline-offset: 2px; }
+h1, h2, h3 { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; letter-spacing: .01em; line-height: 1.15; }
+h2 { font-size: 2.1rem; margin: 0 0 .4rem; }
+h3 { font-size: 1.4rem; margin: 2rem 0 .5rem; }
+p { margin: 0 0 1rem; }
+code, pre { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .86em; }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 14px 16px; border-radius: 10px; overflow-x: auto; line-height: 1.5; border: 1px solid var(--line); }
+pre code { background: none; padding: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+/* hero */
+.hero { background: linear-gradient(160deg, var(--hero-a), var(--hero-b)); color: var(--hero-ink); padding: 56px 0 44px; position: relative; overflow: hidden; }
+.hero::after { content: ''; position: absolute; inset: auto 0 0 0; height: 120px; background: repeating-linear-gradient(0deg, transparent 0 11px, rgba(255,255,255,.06) 11px 12px), repeating-linear-gradient(90deg, transparent 0 59px, rgba(255,255,255,.06) 59px 60px); mask: linear-gradient(transparent, #000); -webkit-mask: linear-gradient(transparent, #000); }
+.hero .kicker { font: 700 .95rem 'Barlow Condensed', sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #ffb36b; }
+.hero h1 { font-size: clamp(2.4rem, 6vw, 4rem); margin: .2rem 0 .8rem; }
+.hero p.lede { font-size: 1.15rem; max-width: 760px; color: #d6defa; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 28px; position: relative; z-index: 1; }
+.stat { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; padding: 12px 14px; }
+.stat b { display: block; font: 800 1.9rem 'Barlow Condensed', sans-serif; color: #fff; }
+.stat span { font-size: .85rem; color: #c8d2f4; }
+.hero-links { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; position: relative; z-index: 1; }
+.btn { display: inline-block; padding: 9px 16px; border-radius: 999px; background: #fff; color: #10204a; font-weight: 600; text-decoration: none; font-size: .95rem; }
+.btn.ghost { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); }
+
+/* layout */
+.layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 40px; padding-top: 32px; padding-bottom: 64px; }
+nav.toc { position: sticky; top: 16px; align-self: start; font-size: .9rem; max-height: calc(100vh - 32px); overflow: auto; }
+nav.toc b { font: 700 .85rem 'Barlow Condensed', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+nav.toc ol { list-style: none; padding: 0; margin: 10px 0 0; counter-reset: t; }
+nav.toc li { counter-increment: t; }
+nav.toc a { display: block; padding: 5px 10px; border-left: 2px solid var(--line); color: var(--ink-2); text-decoration: none; }
+nav.toc a::before { content: counter(t) '. '; color: var(--ink-3); }
+nav.toc a:hover, nav.toc a.on { color: var(--accent); border-left-color: var(--accent); }
+section { padding: 8px 0 36px; border-bottom: 1px solid var(--line); margin-bottom: 36px; scroll-margin-top: 12px; }
+section:last-of-type { border-bottom: 0; }
+.sub { color: var(--ink-2); font-size: 1.05rem; margin-bottom: 1.4rem; }
+
+/* components */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin: 0 0 1.2rem; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.tag { display: inline-block; font: 600 .72rem Inter, sans-serif; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.callout { border-left: 4px solid var(--warm); background: var(--surface); padding: 14px 18px; border-radius: 0 12px 12px 0; margin: 0 0 1.2rem; box-shadow: var(--shadow); }
+.callout b:first-child { color: var(--warm); }
+
+/* timeline */
+.timeline { list-style: none; padding: 0; margin: 0; position: relative; }
+.timeline::before { content: ''; position: absolute; left: 15px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+.timeline li { position: relative; padding: 0 0 22px 48px; }
+.timeline li::before { content: attr(data-n); position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 700 .9rem 'Barlow Condensed', sans-serif; display: grid; place-items: center; }
+.timeline li.phase::before { background: var(--warm); }
+.timeline h4 { margin: 3px 0 4px; font: 700 1.2rem 'Barlow Condensed', sans-serif; }
+.timeline p { margin: 0 0 .4rem; color: var(--ink-2); }
+.quote { font-style: italic; color: var(--ink); border-left: 3px solid var(--line); padding-left: 12px; margin: 6px 0; }
+
+/* figures */
+figure { margin: 0 0 1.4rem; }
+figure img { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--line); }
+figcaption { font-size: .85rem; color: var(--ink-3); margin-top: 6px; }
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 1.4rem; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 0 0 1.4rem; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 640px; height: auto; }
+.diagram svg text { font-family: Inter, sans-serif; fill: var(--ink); }
+.diagram .box { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
+.diagram .boxa { fill: var(--accent); }
+.diagram .boxw { fill: var(--warm); }
+.diagram .on-accent { fill: var(--accent-ink); font-weight: 600; }
+.diagram .muted { fill: var(--ink-3); font-size: 12px; }
+.diagram .arrow { stroke: var(--ink-3); stroke-width: 1.8; fill: none; marker-end: url(#ah); }
+.diagram .dash { stroke-dasharray: 5 4; }
+
+/* unknowns */
+.uu { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.uu .card h4 { margin: 0 0 6px; font: 700 1.15rem 'Barlow Condensed', sans-serif; }
+.uu .card p { margin: 0 0 .5rem; font-size: .93rem; color: var(--ink-2); }
+.uu .card p.here { color: var(--ink); font-size: .9rem; border-top: 1px dashed var(--line); padding-top: .5rem; margin-top: .6rem; }
+.uu .card p.here::before { content: 'Here: '; font-weight: 600; color: var(--warm); }
+.group-title { font: 700 .9rem 'Barlow Condensed', sans-serif; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); margin: 1.8rem 0 .7rem; }
+
+.themebtn { position: fixed; right: 16px; bottom: 16px; z-index: 5; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: 500 .85rem Inter, sans-serif; cursor: pointer; box-shadow: var(--shadow); }
+footer { color: var(--ink-3); font-size: .85rem; padding: 24px 0 60px; border-top: 1px solid var(--line); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .layout > * { min-width: 0; }
+  nav.toc { position: static; max-height: none; margin-bottom: 24px; }
+  nav.toc ol { columns: 2; column-gap: 12px; }
+}
+@media (max-width: 520px) {
+  nav.toc ol { columns: 1; }
+  h2 { font-size: 1.75rem; }
+  .hero { padding-top: 40px; }
+}
+</style>
+</head>
+<body>
+<button class="themebtn" id="themebtn" type="button" aria-label="Switch light or dark theme">Theme</button>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Development journey</div>
+    <h1>Fog City TV, from first prompt to Cloudflare</h1>
+    <p class="lede">How a simulated smart TV with four channels was built in a browser through conversation with Claude: the decisions, the full tech stack and every dependency, how the graphics and sound were made, how the Claude channel reaches the API through a Cloudflare Worker, and the things nobody tells you until they break.</p>
+    <div class="stats">
+      <div class="stat"><b>4</b><span>channels: weather, gallery, fireplace, Claude</span></div>
+      <div class="stat"><b>0</b><span>npm packages at run time</span></div>
+      <div class="stat"><b>~2,900</b><span>lines of hand-written code</span></div>
+      <div class="stat"><b>$3.10</b><span>of AI media generation (fal)</span></div>
+      <div class="stat"><b>&lt;2&cent;</b><span>per spoken TV command to Claude</span></div>
+      <div class="stat"><b>$0</b><span>hosting: GitHub Pages plus Cloudflare free plan</span></div>
+    </div>
+    <div class="hero-links">
+      <a class="btn" href="../">Open the TV</a>
+      <a class="btn ghost" href="https://github.com/az9713/fog-city-tv">Source on GitHub</a>
+      <a class="btn ghost" href="https://github.com/az9713/fog-city-tv/blob/main/docs/JOURNEY.md">Detailed notes (Markdown)</a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap layout">
+<nav class="toc" aria-label="Contents">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#big-picture">The big picture</a></li>
+    <li><a href="#timeline">Timeline</a></li>
+    <li><a href="#stack">Tech stack</a></li>
+    <li><a href="#deps">Every dependency</a></li>
+    <li><a href="#graphics">Graphics and animation</a></li>
+    <li><a href="#sound">Sound</a></li>
+    <li><a href="#apis">APIs, SDKs, libraries</a></li>
+    <li><a href="#talk">The Claude channel</a></li>
+    <li><a href="#cloudflare">How Cloudflare works</a></li>
+    <li><a href="#unknowns">Unknown unknowns</a></li>
+    <li><a href="#bugs">What broke</a></li>
+    <li><a href="#costs">What it cost</a></li>
+    <li><a href="#next">Where to go next</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- 1 -->
+<section id="big-picture">
+  <h2>The big picture</h2>
+  <p class="sub">A static web page draws a TV. Three channels need only free public data. The fourth talks to Claude through a small proxy that holds the API key.</p>
+  <div class="diagram" role="img" aria-label="System diagram: the browser loads the static site from GitHub Pages, reads free public APIs directly, and reaches the Claude API only through a Cloudflare Worker or the local Python server.">
+    <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" style="fill: var(--ink-3)"/></marker></defs>
+      <rect class="boxa" x="330" y="140" width="240" height="84" rx="12"/>
+      <text class="on-accent" x="450" y="174" text-anchor="middle" font-size="17">Your browser</text>
+      <text class="on-accent" x="450" y="198" text-anchor="middle" font-size="13" font-weight="400">HTML, CSS, JavaScript modules</text>
+
+      <rect class="box" x="20" y="20" width="230" height="70" rx="10"/>
+      <text x="135" y="50" text-anchor="middle" font-size="15" font-weight="600">GitHub Pages</text>
+      <text class="muted" x="135" y="72" text-anchor="middle">serves the files, free</text>
+
+      <rect class="box" x="20" y="270" width="250" height="74" rx="10"/>
+      <text x="145" y="298" text-anchor="middle" font-size="15" font-weight="600">Free public data</text>
+      <text class="muted" x="145" y="320" text-anchor="middle">NWS weather, IEM radar, AIC museum</text>
+
+      <rect class="boxw" x="640" y="20" width="240" height="78" rx="10"/>
+      <text class="on-accent" x="760" y="50" text-anchor="middle" font-size="15">Cloudflare Worker</text>
+      <text class="on-accent" x="760" y="72" text-anchor="middle" font-size="12" font-weight="400">holds the key, checks passcode</text>
+
+      <rect class="box" x="640" y="140" width="240" height="70" rx="10"/>
+      <text x="760" y="170" text-anchor="middle" font-size="15" font-weight="600">server.py on the laptop</text>
+      <text class="muted" x="760" y="192" text-anchor="middle">same job, for localhost</text>
+
+      <rect class="box" x="640" y="270" width="240" height="74" rx="10"/>
+      <text x="760" y="300" text-anchor="middle" font-size="15" font-weight="600">Claude API</text>
+      <text class="muted" x="760" y="322" text-anchor="middle">api.anthropic.com/v1/messages</text>
+
+      <path class="arrow" d="M250 60 C 300 60, 330 110, 380 140"/>
+      <text class="muted" x="250" y="118">1. page files</text>
+      <path class="arrow" d="M380 224 C 340 260, 300 290, 272 300"/>
+      <text class="muted" x="250" y="250">2. data, no key</text>
+      <path class="arrow" d="M570 160 C 600 120, 610 80, 638 66"/>
+      <text class="muted" x="470" y="118">3. Fog City Talk</text>
+      <path class="arrow dash" d="M570 190 L 638 178"/>
+      <path class="arrow" d="M820 98 L 820 268"/>
+      <path class="arrow dash" d="M700 210 L 700 268"/>
+      <text class="muted" x="828" y="236">4. adds key</text>
+    </svg>
+  </div>
+  <div class="grid2">
+    <div class="card"><b>What you see.</b> A wooden room with a TV in it, an on-screen remote, and four channels: a 1990s-style weather station for San Francisco with smooth jazz and an announcer, a public-domain art gallery, a never-ending fireplace, and Fog City Talk, where you speak to Claude and it answers out loud and can run the TV.</div>
+    <div class="card"><b>What it is underneath.</b> About 2,900 lines of plain HTML, CSS and JavaScript with no framework and no build step, a 150-line Python server, a 75-line Cloudflare Worker, six AI-generated photos and one AI-generated 10-second video.</div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="timeline">
+  <h2>Timeline: from the first prompt to the Worker</h2>
+  <p class="sub">Everything happened in conversation with Claude Code on the web, in early November 2026. The laptop was attached later for files and for running commands.</p>
+  <ol class="timeline">
+    <li class="phase" data-n="1"><h4>The first prompt</h4>
+      <p>The spark was Tristen O'Brien's YouTube video, in which he used Claude to build custom Android TV apps: a 90s weather channel, an art gallery, a fireplace and a Claude chat channel. The ask was to build the same kind of channels without an Android TV, as a simulated TV in a web page.</p></li>
+    <li data-n="2"><h4>Research and a plan</h4>
+      <p>Each data source was checked for terms, keys, rate limits and whether a browser may call it directly (CORS). One early question was whether a Claude subscription could power a TV channel. It can't: third-party apps must use an API key. So the subscription was used only to build the app, and the Claude channel was postponed.</p></li>
+    <li data-n="3"><h4>Studying the look</h4>
+      <p>YouTube is blocked from the cloud sandbox, so the video was downloaded on the laptop with <code>yt-dlp</code> and cut into contact sheets with <code>ffmpeg</code> to study each channel's style.</p></li>
+    <li data-n="4"><h4>Generating the media with fal</h4>
+      <p>Photoreal sky-cam stills (one camera view, six weather states) and a fireplace video were generated through Claude's fal connector, for about $3.10. Section 5 explains the techniques.</p></li>
+    <li data-n="5"><h4>Building and testing</h4>
+      <p>The shell, router, weather, gallery and fireplace modules were written. Playwright drove a headless browser twice, once with fake data and once with the network cut off, and the screenshots exposed layout bugs to fix.</p></li>
+    <li data-n="6"><h4>First live run on the laptop</h4>
+      <p>Real browsers found what the sandbox couldn't: the museum refused requests from <code>localhost</code>, and the downtown weather station reports no pressure or wind. Both were fixed.</p></li>
+    <li data-n="7"><h4>Rename and publish</h4>
+      <p>The working name was replaced with <b>Fog City TV</b>, the city switched from New York to San Francisco and Celsius, and the site went to GitHub with GitHub Pages.</p></li>
+    <li class="phase" data-n="8"><h4>Reversal: add the Claude channel</h4>
+      <p>A $100 API promo credit (expiring 11 November 2026) made a Claude channel worth doing. The rule from the start: the API key never goes in the page or the repo.</p></li>
+    <li data-n="9"><h4>The proxy, the tool loop and cost tuning</h4>
+      <p><code>server.py</code> became the local server plus a key-holding proxy, and <code>worker/worker.js</code> its cloud twin. Claude got five tools to run the TV plus web search. Tests ran first against a fake Claude, then live on the laptop. A newer web search tool turned out to use 2.7 times the tokens, so the plain one was kept.</p></li>
+    <li data-n="10"><h4>Docs, real screenshots, first merge</h4>
+      <p>Real answers were captured as screenshots for the README, a gallery race condition was fixed, and pull request #1 was merged.</p></li>
+    <li class="phase" data-n="11"><h4>Cloudflare Worker</h4>
+      <p>From the laptop, <code>wrangler</code> logged in to Cloudflare (it took three tries; see the unknown unknowns), created a KV namespace for the daily cap, registered the <code>az9713.workers.dev</code> subdomain, deployed the Worker and stored the key and a passcode as secrets. Four tests passed: right origin and passcode gives 200, no passcode 401, wrong origin 403, and a real question got an answer.</p></li>
+    <li data-n="12"><h4>Public site goes live</h4>
+      <p>Pull request #2 pointed <code>js/config.js</code> at the Worker and made <code>localhost</code> always use the local proxy. After the merge, GitHub Pages rebuilt and the public TV can talk, behind the passcode.</p></li>
+  </ol>
+</section>
+
+<!-- 3 -->
+<section id="stack">
+  <h2>Tech stack</h2>
+  <p class="sub">Deliberately small: the browser already ships a graphics engine, an audio synthesizer and a speech engine.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Layer</th><th>Technology</th><th>Role here</th></tr>
+    <tr><td>Markup and layout</td><td>HTML5, CSS3 (grid, flexbox, transforms, filters, keyframe animations)</td><td>The room, the TV bezel, every channel layout, most animation</td></tr>
+    <tr><td>Logic</td><td>JavaScript ES modules, loaded natively by the browser</td><td>Router, channels, data fetching, the Claude tool loop</td></tr>
+    <tr><td>2D drawing</td><td>Canvas 2D, inline SVG</td><td>Pixel-art weather icons, rain and fog particles, the logo</td></tr>
+    <tr><td>Video</td><td>HTML <code>&lt;video&gt;</code>, H.264 MP4</td><td>The fireplace loop, crossfaded between two players</td></tr>
+    <tr><td>Audio</td><td>Web Audio API</td><td>Generative jazz, fire crackle, UI sounds. No audio files.</td></tr>
+    <tr><td>Speech</td><td>Web Speech API: <code>speechSynthesis</code> and <code>SpeechRecognition</code></td><td>The weather announcer, Claude's voice, and voice input</td></tr>
+    <tr><td>Storage</td><td><code>localStorage</code></td><td>Gallery settings, the passcode on each device, cached museum lists</td></tr>
+    <tr><td>Local server</td><td>Python 3 standard library (<code>http.server</code>, <code>urllib</code>, <code>json</code>)</td><td>Serves the site and proxies <code>/api/claude</code> on the laptop</td></tr>
+    <tr><td>Edge proxy</td><td>Cloudflare Workers (V8 isolates), Workers KV</td><td>Holds the key for the public site, checks origin and passcode, daily cap</td></tr>
+    <tr><td>Hosting</td><td>GitHub Pages</td><td>Serves the static site from the <code>main</code> branch</td></tr>
+    <tr><td>AI at run time</td><td>Claude API (Messages API), model <code>claude-opus-5-5</code></td><td>Fog City Talk</td></tr>
+    <tr><td>AI at build time</td><td>Claude Code (writing the code), fal (Nano Banana Pro, Kling 3.0 Pro, Wan 3.0)</td><td>Code, photos and video</td></tr>
+    <tr><td>Testing</td><td>Playwright with Chromium, Node.js</td><td>End-to-end tests with fake, offline and live data</td></tr>
+  </table></div>
+</section>
+
+<!-- 4 -->
+<section id="deps">
+  <h2>Every dependency</h2>
+  <p class="sub">"Dependency" means four different things here, and only the first list matters to a visitor.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">1. Needed to watch the TV</h3>
+      <ul>
+        <li>A modern browser. Chrome or Edge for voice input; Firefox works for everything but the microphone.</li>
+        <li>Google Fonts: Barlow Condensed, Cormorant Garamond, Inter (Open Font License).</li>
+        <li>Network access to NWS, IEM and AIC for live data. Without it the TV falls back to sample weather and local photos.</li>
+        <li>For Fog City Talk on the public site: the Worker, and the passcode.</li>
+      </ul>
+      <p><span class="tag">npm packages</span> none. <span class="tag">CDN scripts</span> none.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">2. Needed to run it at home</h3>
+      <ul>
+        <li>Python 3 (any recent version). <code>start.bat</code> runs <code>python server.py</code>. Standard library only, so no <code>pip install</code>.</li>
+        <li>A file named <code>.anthropic_key</code> next to <code>server.py</code> for the Claude channel. Git ignores it.</li>
+        <li>Why a server at all: browsers refuse to load JavaScript modules from <code>file://</code> pages.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">3. Needed to develop it</h3>
+      <ul>
+        <li>Git, and a GitHub account.</li>
+        <li>Node.js 18 or later and Playwright, for <code>tests/run.js</code>.</li>
+        <li>ffmpeg, to re-encode video and resize images.</li>
+        <li>yt-dlp, only for studying a reference video.</li>
+        <li>Wrangler (Cloudflare's command-line tool), run with <code>npx wrangler</code>, so nothing is installed globally.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">4. Services and accounts</h3>
+      <ul>
+        <li>GitHub (code and Pages hosting): free.</li>
+        <li>Cloudflare (Worker and KV): free plan.</li>
+        <li>Claude Console (API key, workspace with a $20 monthly spend limit): pay per token.</li>
+        <li>fal (media generation, build time only): about $3.10 of a $10 credit.</li>
+        <li>Claude subscription (Claude Code, used to write everything).</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Files and what each one does</h3>
+  <div class="tablewrap"><table>
+    <tr><th>File</th><th>Lines</th><th>Job</th></tr>
+    <tr><td><code>index.html</code></td><td>58</td><td>The TV frame, power screen and on-screen remote</td></tr>
+    <tr><td><code>styles.css</code></td><td>262</td><td>Every look and most of the animation</td></tr>
+    <tr><td><code>js/app.js</code></td><td>157</td><td>Stage scaling, router, remote keys, shared audio graph, on-screen display</td></tr>
+    <tr><td><code>js/weather.js</code></td><td>496</td><td>Weather station: NWS data, segments, radar, sky cam, crawl, announcer</td></tr>
+    <tr><td><code>js/icons.js</code></td><td>125</td><td>Animated pixel-art weather icons and the text-to-icon classifier</td></tr>
+    <tr><td><code>js/jazz.js</code></td><td>158</td><td>The generative smooth-jazz engine</td></tr>
+    <tr><td><code>js/gallery.js</code></td><td>260</td><td>Museum search, frames and mats, night dimming, settings</td></tr>
+    <tr><td><code>js/fireplace.js</code></td><td>165</td><td>Seamless video loop, procedural crackle, sleep timer</td></tr>
+    <tr><td><code>js/home.js</code></td><td>58</td><td>The launcher screen</td></tr>
+    <tr><td><code>js/talk.js</code></td><td>354</td><td>Fog City Talk: overlay, voice, the Claude tool loop, TV tools</td></tr>
+    <tr><td><code>js/util.js</code>, <code>js/config.js</code></td><td>61</td><td>Location, storage, fetch with timeout, sun position; the Worker address</td></tr>
+    <tr><td><code>server.py</code></td><td>153</td><td>Local static server plus the Claude proxy</td></tr>
+    <tr><td><code>worker/worker.js</code>, <code>worker/wrangler.toml</code></td><td>90</td><td>The Cloudflare Worker and its deploy settings (no secrets)</td></tr>
+    <tr><td><code>tests/run.js</code></td><td>108</td><td>Playwright end-to-end test</td></tr>
+  </table></div>
+</section>
+
+<!-- 5 -->
+<section id="graphics">
+  <h2>How the graphics and animation were made</h2>
+  <p class="sub">Three sources: hand-written CSS and SVG, procedural drawing in Canvas, and AI-generated photos and video. No image editor was used.</p>
+
+  <h3>One fixed 1920 x 1080 stage</h3>
+  <p>Every channel is laid out in TV pixels on a 1920 x 1080 box, and <code>app.js</code> scales that box with a CSS <code>transform: scale()</code> to fit the window. That is why the TV looks the same on a phone and a 4K monitor, and why no layout needed responsive breakpoints.</p>
+
+  <h3>Pure CSS animation</h3>
+  <div class="grid3">
+    <div class="card"><b>CRT power-on.</b> A thin white line holds for a moment, opens to the full screen, then fades: a 700 ms <code>@keyframes</code> animation on <code>clip-path: inset()</code> and opacity, like an old tube warming up.</div>
+    <div class="card"><b>Synthwave home screen.</b> Striped sun bands from gradients, and a perspective grid whose background position slides 90 px every 3 seconds in an infinite loop, which reads as endless forward motion.</div>
+    <div class="card"><b>Logo fly-in.</b> The weather logo scales up from 5% with a slight rotation and an overshoot curve (<code>cubic-bezier(.2,.9,.2,1)</code>) over 2.2 seconds.</div>
+    <div class="card"><b>Ken Burns.</b> The sky cam zooms 6% and drifts over 40 seconds, alternating direction forever, so a still photo feels like live video.</div>
+    <div class="card"><b>Lightning.</b> A white layer flashes in three uneven pulses within half a second, only over the sky-cam panel, during storms.</div>
+    <div class="card"><b>Crossfades.</b> Gallery paintings and sky-cam states are stacked layers whose opacity transitions, so nothing ever cuts hard.</div>
+  </div>
+
+  <h3>Procedural drawing in JavaScript</h3>
+  <div class="grid2">
+    <div class="card"><b>Pixel-art weather icons.</b> Drawn pixel by pixel on a 32 x 32 canvas every frame, then scaled up with <code>image-rendering: pixelated</code> so they stay crisp. Sun rays rotate, rain falls, clouds drift and lightning flickers; at night the sun becomes a moon. A small classifier turns NWS text such as "Slight Chance Rain Showers" into one of nine icon types.</div>
+    <div class="card"><b>The radar map.</b> Built from map tiles with Web Mercator maths: the Bay Area centre (37.75 N, 122.15 W) is projected to pixel coordinates at zoom level 9, the code works out which 256-pixel tiles cover the panel, lays county and state line tiles underneath, and loops 12 radar frames from the last hour. City labels use the same projection.</div>
+    <div class="card"><b>Weather particles.</b> A canvas overlay on the sky cam draws falling rain, snow or drifting fog that matches the live conditions, using <code>requestAnimationFrame</code> at the screen's refresh rate.</div>
+    <div class="card"><b>The logo.</b> Hand-written SVG: a chrome-gradient italic "FOG CITY", gold "WEATHER STATION", an orbit ellipse, sun, cloud and bolt, all inline in <code>weather.js</code>.</div>
+  </div>
+
+  <h3>AI-generated photos and video (fal)</h3>
+  <div class="grid2">
+    <div class="card"><b>Six weathers, one camera.</b> One base image of the skyline from Treasure Island was generated with Nano Banana Pro. Each weather state (sunny, overcast, fog, rain, storm, clear night) was then made by <i>editing</i> that same image, with every prompt starting "Keep the exact same camera position, framing, skyline, bridge and water." Editing instead of generating six images keeps the framing identical, so the states crossfade without a jump.</div>
+    <div class="card"><b>A fire with no seam.</b> A still of a brick fireplace was animated by Kling 3.0 Pro with the <i>same image as the first and the last frame</i>, so the 10-second clip ends where it starts. Two <code>&lt;video&gt;</code> players then hand over 0.6 seconds before the end, one fading in as the other fades out. Wan 3.0 made a comparison clip; Kling's loop point matched better.</div>
+  </div>
+  <div class="shots">
+    <figure><img src="screenshots/weather-skycam.jpg" alt="The weather station showing the Fog City sky cam" loading="lazy"><figcaption>Sky cam: an edited AI photo plus Ken Burns motion</figcaption></figure>
+    <figure><img src="screenshots/weather-radar.jpg" alt="Animated Doppler radar over the Bay Area" loading="lazy"><figcaption>Radar: map tiles placed with Mercator maths</figcaption></figure>
+    <figure><img src="screenshots/fireplace.jpg" alt="The never-ending fireplace" loading="lazy"><figcaption>Fireplace: a first-frame-equals-last-frame video loop</figcaption></figure>
+    <figure><img src="screenshots/gallery.jpg" alt="A public-domain painting in a matted frame" loading="lazy"><figcaption>Gallery: CSS frame, mat and shadow around a museum image</figcaption></figure>
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="sound">
+  <h2>Sound: synthesized, never recorded</h2>
+  <p class="sub">There is not one audio file in the repo. Everything is generated live by the Web Audio API.</p>
+  <div class="grid2">
+    <div class="card"><b>Generative smooth jazz.</b> An 8-bar progression in F (Fmaj9, Dm9, Gm9, C13 and so on) is played by an FM electric piano, a walking bass, brushed drums made from noise, and a sparse melody chosen from the F major pentatonic scale. Notes are numbered the MIDI way and converted with f = 440 x 2<sup>(m - 69)/12</sup>. A reverb is made by filling a buffer with decaying random noise. Because the melody and fills are random, it never plays the same way twice.</div>
+    <div class="card"><b>Fire crackle.</b> A low "roar" bed of filtered brown noise 23 seconds long and a "hiss" bed 29 seconds long. Those lengths are coprime, so the combination repeats only every 23 x 29 = 667 seconds. On top, crackles arrive as a Poisson process (about 7 a second, in random clusters), each a short burst of band-pass-filtered noise with random pitch and stereo position, plus pops and an occasional "log settles" thump.</div>
+    <div class="card"><b>One shared audio graph.</b> Every channel plugs into one master volume, then a compressor, then the speakers. Claude's <code>set_volume</code> tool turns that master knob.</div>
+    <div class="card"><b>Voices.</b> The announcer and Claude both speak through <code>speechSynthesis</code>, which uses the voices installed in your operating system (for example Microsoft David or Zira on Windows). That's why the voice differs between computers.</div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="apis">
+  <h2>External APIs, SDKs and libraries</h2>
+  <p class="sub">Every external call, who runs it, and whether it needs a key.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Service</th><th>Used for</th><th>Key?</th><th>Called from</th></tr>
+    <tr><td>National Weather Service <code>api.weather.gov</code></td><td>Current conditions from the four nearest stations, forecast in Celsius, alerts</td><td>No</td><td>Browser</td></tr>
+    <tr><td>Iowa Environmental Mesonet (Iowa State University)</td><td>NEXRAD radar tiles for the last hour, county and state lines</td><td>No</td><td>Browser</td></tr>
+    <tr><td>Art Institute of Chicago API and IIIF image server</td><td>Searching public-domain paintings and fetching the images</td><td>No</td><td>Browser</td></tr>
+    <tr><td>Google Fonts</td><td>Typefaces</td><td>No</td><td>Browser</td></tr>
+    <tr><td>Claude API (Messages API)</td><td>Fog City Talk answers, tool calls, web search</td><td>Yes</td><td>The proxy only</td></tr>
+    <tr><td>Claude web search tool <code>web_search_20250305</code></td><td>News, streaming and other fresh facts, at most 2 searches a question</td><td>Same key</td><td>Runs inside Anthropic</td></tr>
+    <tr><td>Browser speech services</td><td>Speech-to-text behind <code>SpeechRecognition</code> (Google for Chrome, Microsoft for Edge)</td><td>No</td><td>Browser</td></tr>
+    <tr><td>Cloudflare Workers and KV</td><td>The public proxy and its daily counter</td><td>Account</td><td>Cloudflare's network</td></tr>
+    <tr><td>fal</td><td>Media generation, at build time only</td><td>Connector</td><td>Claude, during development</td></tr>
+  </table></div>
+  <div class="callout"><b>No SDK, on purpose.</b> Anthropic publishes SDKs for Python, TypeScript and other languages, and they are the usual way to call the Claude API. Here the API is called with plain HTTP (<code>urllib</code> in Python, <code>fetch</code> in the Worker) because the proxy only forwards one kind of request and the project wanted zero packages to install. In a bigger app, the SDK gives you typed responses, retries, streaming helpers and a ready-made tool loop.</div>
+  <p><b>Libraries:</b> none at run time. The only third-party code is in development: Playwright for tests, and Wrangler for deploying the Worker.</p>
+</section>
+
+<!-- 8 -->
+<section id="talk">
+  <h2>The Claude channel in one diagram</h2>
+  <p class="sub">The page never holds the key. Claude never touches the page directly; it asks, and the page acts.</p>
+  <div class="diagram" role="img" aria-label="Request flow: speech becomes text, the page sends the conversation to the proxy, the proxy adds the key and calls Claude, Claude may ask for a tool, the page runs it and sends the result back, then the answer is spoken.">
+    <svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg">
+      <rect class="box" x="10" y="30" width="150" height="64" rx="10"/><text x="85" y="58" text-anchor="middle" font-size="14" font-weight="600">You speak</text><text class="muted" x="85" y="78" text-anchor="middle">speech to text</text>
+      <rect class="boxa" x="200" y="30" width="170" height="64" rx="10"/><text class="on-accent" x="285" y="58" text-anchor="middle" font-size="14">js/talk.js</text><text class="on-accent" x="285" y="78" text-anchor="middle" font-size="12" font-weight="400">system, messages, tools</text>
+      <rect class="boxw" x="410" y="30" width="170" height="64" rx="10"/><text class="on-accent" x="495" y="58" text-anchor="middle" font-size="14">Proxy</text><text class="on-accent" x="495" y="78" text-anchor="middle" font-size="12" font-weight="400">adds key, fixes model</text>
+      <rect class="box" x="620" y="30" width="170" height="64" rx="10"/><text x="705" y="58" text-anchor="middle" font-size="14" font-weight="600">Claude</text><text class="muted" x="705" y="78" text-anchor="middle">claude-opus-5-5</text>
+      <path class="arrow" d="M160 62 L198 62"/><path class="arrow" d="M370 62 L408 62"/><path class="arrow" d="M580 62 L618 62"/>
+      <path class="arrow" d="M680 94 C 680 135, 330 135, 290 98"/>
+      <text class="muted" x="300" y="160">"tool_use": switch_channel, show_art, set_volume ...</text>
+      <path class="arrow" d="M760 94 L760 178"/>
+      <rect class="box" x="200" y="180" width="300" height="56" rx="10"/><text x="350" y="204" text-anchor="middle" font-size="14" font-weight="600">Page runs the tool, sends tool_result</text><text class="muted" x="350" y="224" text-anchor="middle">loop at most 6 rounds a question</text>
+      <rect class="box" x="560" y="180" width="300" height="56" rx="10"/><text x="710" y="204" text-anchor="middle" font-size="14" font-weight="600">"end_turn": text shown and spoken</text><text class="muted" x="710" y="224" text-anchor="middle">speechSynthesis</text>
+    </svg>
+  </div>
+  <div class="grid2">
+    <div class="card"><b>The proxy decides, not the page.</b> Model <code>claude-opus-5-5</code>, a 2,048-token answer cap, low effort for quick replies, only custom tools accepted from the page, web search added by the proxy with at most 2 uses, and server-side fallback if a safety classifier declines. A tampered page can't buy a pricier model or longer answers.</div>
+    <div class="card"><b>Five TV tools.</b> <code>switch_channel</code>, <code>set_sleep_timer</code>, <code>show_art</code>, <code>set_volume</code> and <code>get_forecast</code>. The system prompt also tells Claude the time, the channel, the latest weather and which painting is on screen, so "who painted this?" works.</div>
+  </div>
+  <div class="shots">
+    <figure><img src="screenshots/talk-weather.jpg" alt="Fog City Talk answering what to wear today" loading="lazy"><figcaption>"What should I wear today?" uses get_forecast</figcaption></figure>
+    <figure><img src="screenshots/talk-art.jpg" alt="Fog City Talk showing Monet paintings" loading="lazy"><figcaption>"Show me some Monet" uses show_art</figcaption></figure>
+  </div>
+  <p>The full mechanics, including the append-only conversation and every stop reason, are in <a href="https://github.com/az9713/fog-city-tv/blob/main/docs/JOURNEY.md#10-fog-city-talk-how-the-claude-channel-works">section 10 of the Markdown notes</a>.</p>
+</section>
+
+<!-- 9 -->
+<section id="cloudflare">
+  <h2>How Cloudflare works, and what the Worker does</h2>
+  <p class="sub">Cloudflare runs one of the world's largest networks of data centres in front of other people's websites. Workers lets you run your own small program on that network.</p>
+
+  <h3>The mental model</h3>
+  <div class="grid3">
+    <div class="card"><b>The edge.</b> Cloudflare has data centres in hundreds of cities. A request to <code>fog-city-talk.az9713.workers.dev</code> is routed (by anycast: the same IP address announced from everywhere) to the nearest one, and the Worker runs there.</div>
+    <div class="card"><b>Isolates, not servers.</b> A Worker is not a virtual machine or a container. It's JavaScript running in a V8 isolate, the same sandbox technology Chrome uses for each tab. Isolates start in milliseconds, so there is no "cold start" to speak of and no server to keep running.</div>
+    <div class="card"><b>You pay per request, not per hour.</b> The free plan allows 100,000 requests a day and 10 ms of CPU time per request. Time spent waiting for Claude to answer doesn't count as CPU time, which is why a 10-second Claude call fits in a 10 ms budget.</div>
+  </div>
+
+  <h3>The pieces this project uses</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Piece</th><th>What it is</th><th>Here</th></tr>
+    <tr><td>Worker</td><td>Your code, one <code>fetch(request, env)</code> function</td><td><code>worker/worker.js</code>, named <code>fog-city-talk</code></td></tr>
+    <tr><td>workers.dev subdomain</td><td>A free address under Cloudflare's domain, chosen once per account</td><td><code>az9713.workers.dev</code></td></tr>
+    <tr><td>Variables</td><td>Plain settings, visible in the dashboard and in <code>wrangler.toml</code></td><td><code>ALLOWED_ORIGIN</code> = the Pages address, <code>DAILY_LIMIT</code> = 200</td></tr>
+    <tr><td>Secrets</td><td>Encrypted settings. Once set, nobody can read them back, not even you; you can only replace them.</td><td><code>ANTHROPIC_API_KEY</code>, <code>PASSCODE</code></td></tr>
+    <tr><td>KV namespace</td><td>A global key-value store, fast to read and eventually consistent</td><td><code>USAGE</code>: one counter per day</td></tr>
+    <tr><td>Wrangler</td><td>The command-line tool that logs in, deploys and sets secrets</td><td>Run from the laptop with <code>npx wrangler</code></td></tr>
+  </table></div>
+
+  <h3>One request, step by step</h3>
+  <ol>
+    <li>The TV page on <code>az9713.github.io</code> sends a POST with the conversation and an <code>x-passcode</code> header.</li>
+    <li>Because the Worker is on a different domain, the browser first sends an <code>OPTIONS</code> "preflight" asking permission. The Worker answers 204 with the CORS headers that allow only the Pages origin.</li>
+    <li>The Worker checks the <code>Origin</code> header (403 if it's another site), that its secrets exist (503), and the passcode (401).</li>
+    <li>It reads today's counter from KV, refuses with 429 at 200 requests, and writes the counter plus one.</li>
+    <li>It rebuilds the request with the fixed model and limits, adds the key from <code>env.ANTHROPIC_API_KEY</code>, and calls the Claude API.</li>
+    <li>It streams Claude's answer straight back to the page with the CORS header attached.</li>
+  </ol>
+
+  <h3>How it was set up</h3>
+<pre><code>npx wrangler login                      # browser opens; click Authorize within ~2 minutes
+npx wrangler kv namespace create USAGE  # prints the id that goes in wrangler.toml
+npx wrangler deploy                     # first deploy registers the workers.dev subdomain
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put PASSCODE</code></pre>
+  <p>Then <code>js/config.js</code> got the Worker address. The address is not a secret: without the passcode, and outside the Pages origin, the Worker refuses.</p>
+
+  <h3>Free-plan limits worth knowing</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Limit</th><th>Free plan</th><th>Effect here</th></tr>
+    <tr><td>Worker requests</td><td>100,000 a day</td><td>Far above the 200-a-day cap</td></tr>
+    <tr><td>CPU per request</td><td>10 ms, network waiting excluded</td><td>The Worker does almost no computing</td></tr>
+    <tr><td>KV reads</td><td>100,000 a day</td><td>One per request</td></tr>
+    <tr><td>KV writes</td><td>1,000 a day; 1 a second to the same key</td><td>One per request, so the 200 cap stays well inside</td></tr>
+    <tr><td>KV visibility</td><td>Changes can take 60 seconds or more to reach other locations</td><td>The daily cap is approximate, not exact (see below)</td></tr>
+  </table></div>
+  <p style="font-size:.85rem;color:var(--ink-3)">Figures from Cloudflare's <a href="https://developers.cloudflare.com/workers/platform/limits/">Workers limits</a>, <a href="https://developers.cloudflare.com/kv/platform/limits/">KV limits</a> and <a href="https://developers.cloudflare.com/kv/concepts/how-kv-works/">How KV works</a> pages, read 3 November 2026.</p>
+</section>
+
+<!-- 10 -->
+<section id="unknowns">
+  <h2>Unknown unknowns</h2>
+  <p class="sub">Things an experienced engineer from another field would not think to ask, each of which mattered in this build.</p>
+
+  <div class="group-title">Secrets and security</div>
+  <div class="uu">
+    <div class="card"><h4>Everything sent to a browser is public</h4><p>Any key in a web page, however hidden or minified, can be read with the browser's developer tools in seconds. The only safe place for a key is a server you control.</p><p class="here">The key lives only in <code>.anthropic_key</code> on the laptop and as a Cloudflare secret. The page talks to a proxy instead.</p></div>
+    <div class="card"><h4>CORS protects users, not servers</h4><p>CORS is a rule browsers enforce on web pages. A script like <code>curl</code> ignores it and can fake any <code>Origin</code> header. So an origin check stops other websites from using your proxy, but not a determined person.</p><p class="here">The passcode is the real lock. The origin check and the daily cap are extra fences.</p></div>
+    <div class="card"><h4>Git remembers forever</h4><p>A secret committed once stays in the history even after you delete the file, and public GitHub repos are scanned by bots within minutes. Rotating the key is the only real fix.</p><p class="here"><code>.gitignore</code> lists <code>.anthropic_key</code>, <code>.talk_passcode</code>, <code>.env</code> and <code>.wrangler/</code>, and they were checked with <code>git status</code> after cloning.</p></div>
+    <div class="card"><h4>Spend limits are your real seatbelt</h4><p>Code bugs and leaks happen. A dollar cap at the provider is the one control that holds even when everything else fails.</p><p class="here">A Console workspace with a $20 monthly limit, plus 200 requests a day at the Worker and 300 at the local server.</p></div>
+    <div class="card"><h4>OAuth logins leave a door open</h4><p>Clicking Authorize for a command-line tool grants it a long-lived token with the listed permissions, stored on that computer.</p><p class="here">Wrangler stays logged in on the laptop with 30 permissions. Revoke it under My Profile, Access Management, Connected Applications in Cloudflare when you no longer deploy.</p></div>
+  </div>
+
+  <div class="group-title">Browsers</div>
+  <div class="uu">
+    <div class="card"><h4>A 403 often looks like a CORS error</h4><p>When a server refuses a request, its error page usually lacks CORS headers, so the browser reports "blocked by CORS policy" and hides the real reason.</p><p class="here">The museum's Cloudflare rejected requests whose <code>Referer</code> was <code>localhost</code>. One line fixed it: <code>&lt;meta name="referrer" content="no-referrer"&gt;</code>.</p></div>
+    <div class="card"><h4>Browsers won't make sound until you touch the page</h4><p>Autoplay policies block audio until a user gesture such as a click or key press.</p><p class="here">Pressing Power is that gesture, and it unlocks the shared audio graph for every channel.</p></div>
+    <div class="card"><h4>JavaScript modules need a web server</h4><p>Double-clicking an HTML file opens it as <code>file://</code>, and browsers refuse to load ES modules from there.</p><p class="here">That's why <code>start.bat</code> runs a tiny local server instead of opening the file.</p></div>
+    <div class="card"><h4>Bots get treated differently</h4><p>Sites behind bot protection often block headless browsers and unusual user agents, so automated tests can pass while real use fails, or the reverse.</p><p class="here">Museum screenshots had to be taken in a visible browser window.</p></div>
+    <div class="card"><h4>Speech recognition is a cloud service</h4><p>The browser's microphone API sends your audio to Google (Chrome) or Microsoft (Edge) for transcription. Firefox doesn't offer it.</p><p class="here">The talk box always has a typing field as well as the mic.</p></div>
+    <div class="card"><h4>Race conditions happen in UIs too</h4><p>Two image loads started in order can finish out of order, and the slower one wins the screen.</p><p class="here">"Show me some Monet" briefly showed a different painting. Each request now gets a sequence number, and stale images are dropped.</p></div>
+  </div>
+
+  <div class="group-title">Hosting and the cloud</div>
+  <div class="uu">
+    <div class="card"><h4>A merge is not instantly live</h4><p>GitHub Pages rebuilds after each push to <code>main</code>, which takes a minute or two, and its CDN plus your browser may keep the old file for several minutes more.</p><p class="here">After a change, wait a few minutes and do a hard refresh (Ctrl+F5).</p></div>
+    <div class="card"><h4>New addresses need a moment for HTTPS</h4><p>A freshly created subdomain has no TLS certificate yet, so the first requests fail with a certificate error.</p><p class="here">The new <code>workers.dev</code> address started answering about three minutes after the first deploy.</p></div>
+    <div class="card"><h4>"Eventually consistent" means counters drift</h4><p>KV copies data to many locations lazily. Two requests in different cities can both read 199 and both write 200. KV is fine for settings and caches, not for exact counts or money.</p><p class="here">The daily cap is a soft brake. Exact counting would need a Durable Object or Cloudflare's rate-limiting binding.</p></div>
+    <div class="card"><h4>Shells change your bytes</h4><p>Piping text in PowerShell can add a byte-order mark or a trailing newline. For a secret, one invisible character means a mismatch.</p><p class="here">The first passcode upload didn't match the file and the test got 401. Re-uploading with a raw byte pipe fixed both secrets.</p></div>
+    <div class="card"><h4>Login windows time out</h4><p>Command-line OAuth starts a tiny local web server and waits a minute or two for the browser to call back. Click late, or click an old tab, and you see "localhost refused to connect".</p><p class="here">It took three tries. Be signed in to the dashboard first, then click <b>Authorize</b> (not "Allow") right away.</p></div>
+    <div class="card"><h4>Sandboxes have their own firewalls</h4><p>Cloud coding environments block many hosts and may block running code downloaded from the internet.</p><p class="here">YouTube, fal's CDN and the Claude API were blocked from the cloud sandbox, so those steps ran on the laptop through a remote session.</p></div>
+    <div class="card"><h4>Copies drift</h4><p>A folder copied out of a repo stops getting updates and quietly falls behind.</p><p class="here">The laptop's original <code>web-tv</code> folder was a day old and not a git folder, so a proper clone was made next to it.</p></div>
+  </div>
+
+  <div class="group-title">AI and its costs</div>
+  <div class="uu">
+    <div class="card"><h4>A subscription is not an API</h4><p>A Claude Pro or Max plan covers Anthropic's own apps and Claude Code. Any app you build must use an API key, billed per token.</p><p class="here">The subscription wrote the code; a separate key with promo credit pays for the channel.</p></div>
+    <div class="card"><h4>The API has no memory</h4><p>Each call resends the whole conversation, so the 20th question costs more than the first. Long chats get expensive quietly.</p><p class="here">History is capped at 40 messages, and NEW starts fresh.</p></div>
+    <div class="card"><h4>Tools can cost more than words</h4><p>Search results are long, and Claude reads all of them as input tokens. Smarter tools can make more round trips.</p><p class="here">A news question cost 13,413 input tokens with the plain search tool and 36,041 with the newer filtering one.</p></div>
+    <div class="card"><h4>Prompt caching exists</h4><p>When the start of a request (system prompt, tools, early history) repeats, the API can cache it, and cached reads are billed at a small fraction of normal input. It needs a <code>cache_control</code> marker and a minimum prompt length.</p><p class="here">Not used yet. It becomes worthwhile as conversations grow and is a good next optimization.</p></div>
+    <div class="card"><h4>Models refuse, pause and split answers</h4><p>A reply can stop for a tool call, pause mid-search, decline, or arrive split into several text blocks around citations. Code that only reads the first block will drop words.</p><p class="here">Every stop reason is handled and all text blocks are joined.</p></div>
+    <div class="card"><h4>Credits expire</h4><p>Promotional API credit has an end date, and unused credit doesn't roll over.</p><p class="here">This credit expires on 11 November 2026, so watch Usage in the Console.</p></div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section id="bugs">
+  <h2>What broke, and the fix</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+    <tr><td>Gallery empty in a real browser</td><td>Museum refused <code>localhost</code> referers with 403</td><td><code>no-referrer</code> meta tag</td></tr>
+    <tr><td>Pressure and wind showed N/A</td><td>The nearest station doesn't report them</td><td>Fill each field from the next of four nearest stations</td></tr>
+    <tr><td>"THI" in the extended forecast</td><td>Day names cut to three letters</td><td>Map "This Afternoon" and "Tonight" to TODAY</td></tr>
+    <tr><td>Lightning washed out the whole TV</td><td>Flash layer covered the full screen</td><td>Confine it to the sky-cam panel</td></tr>
+    <tr><td>Wrong painting after "show me Monet"</td><td>Slower seasonal image loaded last</td><td>Sequence numbers on image loads</td></tr>
+    <tr><td>A search question cost 16 cents</td><td>Filtering search tool made 5 model turns</td><td>Plain search tool, at most 2 searches</td></tr>
+    <tr><td>Cloudflare login timed out twice</td><td>The Authorize click came too late, or on an old tab</td><td>Sign in first, then click within the window</td></tr>
+    <tr><td>Deploy failed</td><td>Account had no workers.dev subdomain</td><td>Registered <code>az9713</code></td></tr>
+    <tr><td>Worker returned 401 with the right passcode</td><td>PowerShell pipe altered the secret's bytes</td><td>Re-upload through a raw byte pipe</td></tr>
+    <tr><td>Laptop would have called the Worker and been refused</td><td>Config pointed every page at the Worker</td><td><code>localhost</code> always uses the local proxy</td></tr>
+  </table></div>
+</section>
+
+<!-- 12 -->
+<section id="costs">
+  <h2>What it cost</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Item</th><th>Cost</th></tr>
+    <tr><td>Writing the code (Claude Code, within an existing subscription)</td><td>No extra charge</td></tr>
+    <tr><td>Media: 8 images and 2 videos on fal</td><td>About $3.10</td></tr>
+    <tr><td>Weather, radar and museum data</td><td>$0</td></tr>
+    <tr><td>Hosting: GitHub Pages and the Cloudflare free plan</td><td>$0</td></tr>
+    <tr><td>Fog City Talk: a TV command (Claude Opus 5.5 at $4 / $20 per million input / output tokens)</td><td>Under 2 cents</td></tr>
+    <tr><td>Fog City Talk: a question needing web search (includes $0.01 per search)</td><td>About 7 cents</td></tr>
+  </table></div>
+</section>
+
+<!-- 13 -->
+<section id="next">
+  <h2>Where to go next</h2>
+  <div class="grid2">
+    <div class="card"><b>Stream the answers.</b> Ask the API for server-sent events and start speaking the first sentence while the rest is still being written. The perceived delay drops from seconds to under one.</div>
+    <div class="card"><b>Let Claude see the painting.</b> Send the on-screen image with the question, and "what's happening in this painting?" becomes a real art lesson instead of a metadata lookup.</div>
+    <div class="card"><b>Exact rate limiting.</b> Replace the KV counter with Cloudflare's rate-limiting binding or a Durable Object, and learn why strongly consistent state is a different engineering problem from caching.</div>
+    <div class="card"><b>Prompt caching and the Batch API.</b> Measure the cache hit rate on long conversations; it is the cheapest cost cut available. Batch processing halves the price for anything that doesn't need an instant answer.</div>
+    <div class="card"><b>A real TV.</b> Make the page an installable PWA and run it full screen on a cheap Android TV stick or a Chromecast in kiosk mode.</div>
+    <div class="card"><b>Your own city.</b> Change <code>PLACE</code> in <code>js/util.js</code> and regenerate the six sky-cam states with the same edit-one-base-image trick.</div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<footer>
+  <div class="wrap">Fog City TV. Built with Claude Code. Weather data from the US National Weather Service and the Iowa Environmental Mesonet; paintings from the Art Institute of Chicago (public domain). Not affiliated with any of them. <a href="https://github.com/az9713/fog-city-tv">Source</a>.</div>
+</footer>
+
+<script>
+(function () {
+  var btn = document.getElementById('themebtn');
+  var root = document.documentElement;
+  try { var t = localStorage.getItem('journey.theme'); if (t) root.setAttribute('data-theme', t); } catch (e) {}
+  btn.addEventListener('click', function () {
+    var cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('journey.theme', next); } catch (e) {}
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (e.isIntersecting) links.forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('main section').forEach(function (s) { io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
