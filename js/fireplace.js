@@ -129,6 +129,11 @@ export class Fireplace {
     this.crackle?.setLevel(this.level * f, 0.5);
     if (left <= 0) { this.sleepAt = 0; window.tvApp.handle('Power'); }
   }
+  setSleep(mins, label = `${mins} min`) {
+    this.sleepAt = mins ? Date.now() + mins * 60000 : 0;
+    if (!mins) { this.el.querySelector('.timer-chip').classList.add('hidden'); this.el.querySelector('.dim').style.opacity = 0; this.crackle?.setLevel(this.level); }
+    this.osd(mins ? `Fire fades out in ${label}` : 'Sleep timer off');
+  }
   setLevel(d) {
     this.level = Math.max(0, Math.min(1, Math.round((this.level + d) * 10) / 10));
     store.set('crackle', this.level);
@@ -146,10 +151,7 @@ export class Fireplace {
       if (k === 'ArrowUp') { this.menuIdx = (this.menuIdx + TIMERS.length - 1) % TIMERS.length; this.renderMenu(); return true; }
       if (k === 'ArrowDown') { this.menuIdx = (this.menuIdx + 1) % TIMERS.length; this.renderMenu(); return true; }
       if (k === 'Enter') {
-        const mins = TIMERS[this.menuIdx][1];
-        this.sleepAt = mins ? Date.now() + mins * 60000 : 0;
-        if (!mins) { this.el.querySelector('.timer-chip').classList.add('hidden'); this.el.querySelector('.dim').style.opacity = 0; this.crackle?.setLevel(this.level); }
-        this.osd(mins ? `Fire fades out in ${TIMERS[this.menuIdx][0]}` : 'Sleep timer off');
+        this.setSleep(TIMERS[this.menuIdx][1], TIMERS[this.menuIdx][0]);
         this.menuOpen = false; this.renderMenu(); return true;
       }
       if (k === 'Back') { this.menuOpen = false; this.renderMenu(); return true; }

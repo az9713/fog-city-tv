@@ -3,6 +3,7 @@ import { Home } from './home.js';
 import { Weather } from './weather.js';
 import { Fireplace } from './fireplace.js';
 import { Gallery } from './gallery.js';
+import { Talk, TalkChannel } from './talk.js';
 import { store } from './util.js';
 
 const stage = document.getElementById('stage');
@@ -71,14 +72,15 @@ export function osd(text, level) {
 }
 
 // ---------- router ----------
-const channels = { home: Home, weather: Weather, fireplace: Fireplace, gallery: Gallery };
+let talk;   // Fog City Talk overlay, created below; it stays on screen across channel changes
+const channels = { home: Home, weather: Weather, fireplace: Fireplace, gallery: Gallery, talk: TalkChannel };
 let current = null; let currentName = null;
 let on = false;
 
 export function go(name) {
   if (current) { try { current.unmount(); } catch (e) { console.error(e); } current.el.remove(); }
   const C = channels[name];
-  current = new C({ go, audio, osd });
+  current = new C({ go, audio, osd, talk });
   currentName = name;
   stage.insertBefore(current.el, osdEl);
   current.mount();
@@ -99,6 +101,7 @@ function powerOff() {
   if (!on) return;
   on = false;
   if (current) { current.unmount(); current.el.remove(); current = null; }
+  talk.close();
   tvEl.classList.remove('on');
   powerScreen.classList.remove('hidden');
   if (audio.ctx) audio.ctx.suspend();
@@ -110,7 +113,7 @@ const keymap = {
   ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
   Enter: 'Enter', ' ': 'Enter', Escape: 'Back', Backspace: 'Back',
   h: 'Home', H: 'Home', m: 'Mute', M: 'Mute', '+': 'VolUp', '=': 'VolUp', '-': 'VolDown', _: 'VolDown',
-  f: 'Fullscreen', F: 'Fullscreen', p: 'Power', P: 'Power',
+  f: 'Fullscreen', F: 'Fullscreen', p: 'Power', P: 'Power', t: 'Talk', T: 'Talk',
 };
 
 function handle(key) {
@@ -122,6 +125,8 @@ function handle(key) {
   if (key === 'Power') { on ? powerOff() : powerOn(); return; }
   if (!on) { powerOn(); return; }
   audio.init();
+  if (talk.onKey(key)) return;                                   // talk overlay consumed it
+  if (key === 'Talk') { talk.show(); return; }
   if (current && current.onKey && current.onKey(key)) return;   // channel consumed it
   if (key === 'VolUp') audio.change(+0.05);
   else if (key === 'VolDown') audio.change(-0.05);
@@ -130,6 +135,7 @@ function handle(key) {
 }
 
 window.addEventListener('keydown', e => {
+  if (e.target.closest?.('input, textarea')) return;   // typing in the talk box
   const k = keymap[e.key];
   if (!k) return;
   e.preventDefault();
@@ -141,8 +147,11 @@ document.getElementById('remote').addEventListener('click', e => {
 });
 powerScreen.addEventListener('click', () => handle('Enter'));
 stage.addEventListener('click', e => {
-  if (!on || !current?.onClick) return;
+  if (!on || !current?.onClick || e.target.closest('.talk')) return;
   current.onClick(e);
 });
 
-window.tvApp = { go, handle, audio };
+talk = new Talk({ go, audio, osd, state: () => ({ channel: currentName, current }) });
+stage.insertBefore(talk.el, osdEl);
+
+window.tvApp = { go, handle, audio, talk };
