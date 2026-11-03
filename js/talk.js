@@ -47,12 +47,13 @@ How to answer:
 Right now: ${fmtDate()} ${fmtTime(new Date(), false)} in ${PLACE.name}. The TV is on the ${tv.channel} channel.${wx ? ` Last weather reading: ${wx.temp} degrees C, ${wx.cond}.` : ''}${art ? ` On screen in the gallery: "${art.title}" by ${art.artist_title || 'unknown artist'}${art.date_display ? ', ' + art.date_display : ''}, from the Art Institute of Chicago. If the viewer asks about "this painting", that is the one.` : ''}`;
 }
 
+// On the laptop (server.py) the local proxy wins, so the Worker is only used by the public site.
+const isLocal = () => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 function proxyUrl() {
-  if (TALK.proxy) return TALK.proxy.replace(/\/$/, '');
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) return '/api/claude';
-  return '';
+  if (isLocal()) return '/api/claude';
+  return TALK.proxy ? TALK.proxy.replace(/\/$/, '') : '';
 }
-const isRemote = () => !!TALK.proxy;
+const isRemote = () => !isLocal() && !!TALK.proxy;
 
 function spokenText(s) {
   return s.replace(/https?:\/\/\S+/g, '').replace(/[*_#`>]/g, '').replace(/\s+/g, ' ').trim();
