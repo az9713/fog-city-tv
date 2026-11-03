@@ -1,3 +1,7 @@
 node_modules/
 tests/shots/
 tests/shots_off/
+.anthropic_key
+.env
+.dev.vars
+__pycache__/

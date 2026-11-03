@@ -61,23 +61,45 @@ export class Gallery {
     const key = 'aic.' + cat.id + '.' + (cat.id === 'season' ? seasonQuery().label : '');
     const cached = store.get(key, null);
     if (cached && Date.now() - cached.at < 7 * 864e5 && cached.items.length) return cached.items;
-    const url = `${API}?q=${encodeURIComponent(cat.q())}&query[term][is_public_domain]=true&fields=${FIELDS}&limit=60`;
-    const j = await getJSON(url);
-    const items = (j.data || []).filter(a => a.image_id && a.is_public_domain && /painting/i.test(a.classification_title || ''))
-      .map(a => ({ id: a.id, title: a.title, artist_title: a.artist_title, date_display: a.date_display, src: `${IIIF}/${a.image_id}/full/1686,/0/default.jpg`, thumb: `${IIIF}/${a.image_id}/full/400,/0/default.jpg` }));
+    const items = await this.search(cat.q());
     if (items.length) store.set(key, { at: Date.now(), items });
     return items;
   }
 
+  async search(q) {
+    const url = `${API}?q=${encodeURIComponent(q)}&query[term][is_public_domain]=true&fields=${FIELDS}&limit=60`;
+    const j = await getJSON(url);
+    const items = (j.data || []).filter(a => a.image_id && a.is_public_domain && /painting/i.test(a.classification_title || ''))
+      .map(a => ({ id: a.id, title: a.title, artist_title: a.artist_title, date_display: a.date_display, src: `${IIIF}/${a.image_id}/full/1686,/0/default.jpg`, thumb: `${IIIF}/${a.image_id}/full/400,/0/default.jpg` }));
+    return items;
+  }
+
+  // Used by Fog City Talk: show paintings for any search, keeping the most relevant first.
+  async loadQuery(q) {
+    let items = [];
+    try { items = await this.search(q); } catch (e) { console.warn('AIC search failed', e); }
+    if (!items.length) return [];
+    this.override = true;   // a category load still in flight must not replace these
+    this.works = items; this.idx = 0;
+    this.el.querySelector('.status').textContent = '';
+    this.show();
+    return items.map(w => `${w.title}, ${w.artist_title || 'unknown artist'}${w.date_display ? ', ' + w.date_display : ''}`);
+  }
+  currentWork() { return this.works[this.idx] || null; }
+
   async loadCat(id) {
     const cat = CATS.find(c => c.id === id) || CATS[0];
+    this.override = false;
     this.s.cat = cat.id; this.save();
     const status = this.el.querySelector('.status');
     try {
-      this.works = await this.fetchCat(cat);
+      const works = await this.fetchCat(cat);
+      if (this.override) return;
+      this.works = works;
       if (!this.works.length) throw new Error('empty');
       status.textContent = '';
     } catch (e) {
+      if (this.override) return;
       console.warn('AIC fetch failed', e);
       this.works = FALLBACK;
       status.textContent = '';
@@ -91,6 +113,7 @@ export class Gallery {
 
   show() {
     const w = this.works[this.idx]; if (!w) return;
+    const seq = this.showSeq = (this.showSeq || 0) + 1;   // a slower, older image must not land on top
     const [, matCol, gold] = MATS[this.s.mat];
     const pad = SIZES[this.s.size][1];
     const maxW = 1920 - 2 * pad - 160, maxH = 1080 - 2 * pad - 140;
@@ -105,6 +128,7 @@ export class Gallery {
     frame.appendChild(bevel);
     const layer = h('div', 'art'); layer.style.opacity = 0; layer.appendChild(frame);
     img.onload = () => {
+      if (seq !== this.showSeq) return;
       const old = this.artEl;
       this.el.insertBefore(layer, this.el.querySelector('.status'));
       requestAnimationFrame(() => { layer.style.opacity = 1; old.style.opacity = 0; });
@@ -113,7 +137,7 @@ export class Gallery {
       this.showCaption(w);
       store.set('artLast', { thumb: w.thumb });
     };
-    img.onerror = () => { this.works.splice(this.idx, 1); if (this.works.length) { this.idx %= this.works.length; this.show(); } };
+    img.onerror = () => { if (seq !== this.showSeq) return; this.works.splice(this.idx, 1); if (this.works.length) { this.idx %= this.works.length; this.show(); } };
     img.src = w.src;
     clearTimeout(this.changeTimer);
     const mins = CHANGE[this.s.change][1];

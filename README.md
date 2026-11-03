@@ -1,6 +1,6 @@
 # Fog City TV
 
-**A simulated smart TV in your browser, with three always-on channels for San Francisco:** a 1990s-style weather station, a public-domain art gallery, and a never-ending fireplace.
+**A simulated smart TV in your browser, with four channels for San Francisco:** a 1990s-style weather station, a public-domain art gallery, a never-ending fireplace, and Fog City Talk, where you talk to Claude and it runs the TV.
 
 ### [Play it now: az9713.github.io/fog-city-tv](https://az9713.github.io/fog-city-tv/)
 
@@ -52,6 +52,22 @@ Public-domain paintings from the Art Institute of Chicago in a matted frame. It 
 |---|---|
 | ![Gallery](docs/screenshots/gallery.jpg) | ![Mat menu](docs/screenshots/gallery-mat-menu.jpg) |
 
+### Fog City Talk
+
+Talk to Claude by voice or keyboard on any channel: press **T**. It answers on screen and out loud, and it can run the TV. It switches channels, sets the fireplace sleep timer, finds paintings, changes the volume, reads the live forecast and searches the web.
+
+| "What should I wear today?" | "Show me some Monet" |
+|---|---|
+| ![Weather advice](docs/screenshots/talk-weather.jpg) | ![Painting search](docs/screenshots/talk-art.jpg) |
+
+| "Put on the fireplace with a 30 minute sleep timer" | "Where can I stream The Bear?" |
+|---|---|
+| ![Fireplace with a sleep timer](docs/screenshots/talk-fireplace.jpg) | ![Where to stream a show](docs/screenshots/talk-streaming.jpg) |
+
+These are real answers from Claude, captured on the laptop. How the channel works inside (the API request, the proxy, tool use, web search and voice) is in [docs/JOURNEY.md, section 10](docs/JOURNEY.md#10-fog-city-talk-how-the-claude-channel-works).
+
+This channel uses the paid Claude API, so it needs your own API key. The key stays in a small proxy and is never in the page or this repo. On the public site the channel stays **off the air** unless you connect your own proxy. Setup, security and cost (under 2 cents for a TV command, about 7 cents for a question that needs a web search) are in **[docs/CLAUDE-CHANNEL.md](docs/CLAUDE-CHANNEL.md)**.
+
 ---
 
 ## Can it be played from this README?
@@ -68,7 +84,7 @@ cd fog-city-tv
 python -m http.server 8080      # or: npx serve -l 8080
 ```
 
-Then open http://localhost:8080. On Windows you can also double-click **`start.bat`**, which starts the server and opens the browser.
+Then open http://localhost:8080. On Windows you can also double-click **`start.bat`**, which runs `python server.py` (the same site plus the Claude proxy for Fog City Talk) and opens the browser. Every channel except Fog City Talk works with any static server.
 
 **Requirements:** a modern browser (Chrome or Edge recommended, Firefox works), Python 3 or Node.js for the local server, and an internet connection for live data. If you're offline, the TV still runs with labelled sample weather and a local photo gallery. See the [journey report](docs/JOURNEY.md#9-requirements-and-dependencies-on-windows) for the full Windows setup.
 
@@ -85,13 +101,14 @@ The on-screen remote and the keyboard do the same things.
 | P | Power |
 | M | Mute |
 | + / - | Volume |
+| T | Talk to Claude (Fog City Talk) |
 | F | Full screen |
 
 In the Fireplace and Gallery, **OK** opens that channel's menu.
 
 ## How it's built
 
-- Plain HTML, CSS and JavaScript ES modules: no framework, no build step, no runtime dependencies, no API keys.
+- Plain HTML, CSS and JavaScript ES modules: no framework, no build step and no runtime dependencies. Only Fog City Talk needs an API key, and that key stays in the proxy (`server.py` or `worker/worker.js`).
 - **Data:**
   - [NWS api.weather.gov](https://www.weather.gov/documentation/services-web-api): observations, forecast and alerts.
   - [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/) NEXRAD tiles: radar and base map.

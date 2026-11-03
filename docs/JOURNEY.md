@@ -1,6 +1,6 @@
 # Fog City TV: the development journey
 
-This is how Fog City TV was built: a simulated smart TV in a web page with three channels (a 1990s weather station, an art gallery and a never-ending fireplace). It covers the requirements, every API and open-source resource, how each graphic and sound was made, how fal was used and what it cost, the bugs found along the way, and what you need on Windows.
+This is how Fog City TV was built: a simulated smart TV in a web page with four channels (a 1990s weather station, an art gallery, a never-ending fireplace and Fog City Talk, a Claude channel that answers by voice and runs the TV). It covers the requirements, every API and open-source resource, how each graphic and sound was made, how fal was used and what it cost, the bugs found along the way, and what you need on Windows.
 
 Everything was built in one day (2026-11-03) through conversation with Claude, working in Claude Code on the web. The author's laptop was attached for file access and, later, for running commands.
 
@@ -15,21 +15,21 @@ The starting point was **[Tristen O'Brien's YouTube video](https://www.youtube.c
 - a never-ending fireplace,
 - a Claude chat channel on the TV.
 
-The goal was to recreate the spirit of three of those channels **without an Android TV**. The result had to be:
+The goal was to recreate the spirit of those channels **without an Android TV**, starting with three and adding the Claude channel at the end. The result had to be:
 
 | Requirement | Decision |
 |---|---|
 | Runs without TV hardware | A web page that draws a TV, with an on-screen remote and keyboard control |
-| Channels | Weather, Art Gallery and Fireplace. The Claude chat channel was dropped, so no API key is needed. |
+| Channels | Weather, Art Gallery and Fireplace first. The Claude chat channel was added later the same day as Fog City Talk (section 10). |
 | City | San Francisco (the first draft assumed New York, and that was corrected) |
 | Units | Celsius, km/h, hPa, km |
 | Visual quality | Photorealism that matches or beats the video, using about $10 of fal credit for media |
 | Branding | Original. The working name used the author's first name; it was later scrubbed and replaced with **Fog City**. |
-| Infrastructure | None: a static site, no backend, no keys, no build step |
+| Infrastructure | A static site with no build step. Only Fog City Talk needs a backend, and it's a tiny proxy that holds the API key. |
 
 ### Why not run Claude with the subscription?
 
-Early research checked whether a Claude Pro/Max subscription could power an in-TV Claude channel. It can't. Anthropic's terms limit subscription OAuth to Claude Code and Anthropic's own apps; third-party products must use an API key. Tristen used the API for the same reason. Dropping the chat channel removed the question entirely: **the subscription was used only to build the app** (Claude Code), and the app itself never calls Claude.
+Early research checked whether a Claude Pro/Max subscription could power an in-TV Claude channel. It can't. Anthropic's terms limit subscription OAuth to Claude Code and Anthropic's own apps; third-party products must use an API key. Tristen used the API for the same reason. So **the subscription was used only to build the app** (Claude Code), and when the Claude channel was added it got its own API key with its own spend limit (section 10).
 
 ---
 
@@ -44,6 +44,7 @@ Early research checked whether a Claude Pro/Max subscription could power an in-T
 7. **Delivery.** The files were copied to the laptop with a `start.bat` launcher.
 8. **Live run on the laptop.** This found two real-world problems that the sandbox couldn't reveal: the museum blocked requests coming from `localhost`, and some weather fields came back empty. Both were fixed (section 8).
 9. **Rename, report and publish.** The personal name was removed, this report was written, and the site went to GitHub with GitHub Pages.
+10. **Claude channel.** Fog City Talk was added with a key-holding proxy. It was tested first against a mock Claude, then live on the laptop, then tuned for cost (section 10).
 
 ---
 
@@ -53,13 +54,17 @@ Early research checked whether a Claude Pro/Max subscription could power an in-T
 index.html          TV frame, power screen, on-screen remote; loads js/app.js
 styles.css          room, TV bezel, CRT power-on, OSD, home, weather, fireplace and gallery styles
 js/app.js           stage scaling (fixed 1920x1080 canvas scaled to fit), router, key map, shared Web Audio graph, OSD
-js/home.js          home launcher: clock, weather chip, three app tiles
+js/home.js          home launcher: clock, weather chip, four app tiles
 js/weather.js       weather station: NWS data, segment rotation, radar, sky cam, crawl, announcer
 js/jazz.js          generative smooth-jazz engine (Web Audio)
 js/icons.js         animated pixel-art weather icons on canvas, and NWS-text-to-icon classifier
 js/fireplace.js     two-video crossfade loop, procedural crackle, sleep timer
 js/gallery.js       AIC public-domain paintings, collections, mats, night dimming, settings menu
 js/util.js          location constants, localStorage wrapper, fetch with timeout, solar elevation
+js/talk.js          Fog City Talk: talk overlay and channel, voice in and out, Claude tool loop, TV tools
+js/config.js        address of the public Claude proxy (empty = off the air)
+server.py           local server: static files plus the /api/claude proxy (Python standard library only)
+worker/worker.js    Cloudflare Worker version of the proxy, for the public site
 assets/skycam/      six weather states of one fixed San Francisco view (JPG)
 assets/fireplace/   fire.mp4 (10 s loop) and poster.jpg
 tests/run.js        Playwright end-to-end test (mock and offline modes)
@@ -148,6 +153,7 @@ The home screen is pure CSS: a synthwave sunset with striped sun bands, an anima
 - **Weather**: the current sky-cam image.
 - **Art Gallery**: the last painting shown.
 - **Fireplace**: the muted fire video.
+- **Fog City Talk**: a microphone on a blue studio glow, with a blinking red on-air light.
 
 ### 6.5 Art gallery
 
@@ -234,6 +240,9 @@ Other costs:
 | The sun icon in the logo collided with the text | SVG layout | The sun group was moved and scaled |
 | **The gallery showed no paintings in a real browser** (the sandbox tests had passed) | AIC's Cloudflare returns **403** to requests whose `Referer` is `localhost` or `127.0.0.1`. The browser reported this as a CORS error, because a 403 page has no CORS header. | `<meta name="referrer" content="no-referrer">` in `index.html`. Verified live: real paintings loaded (the first was George Inness, *Harvest, Montclair, New Jersey*, 1884). AIC also blocks headless browsers, so test screenshots of the gallery use a visible browser. |
 | **Pressure and wind showed N/A in live data** | The San Francisco Downtown station doesn't report them | Fetch the nearest four stations and fill each missing field from the next one that has it |
+| Claude channel: one news question used 36,000 input tokens (about 16 cents) | The `web_search_20260209` tool filters results by running code on Anthropic's side, which took 5 model turns | Switched to the plain `web_search_20250305` tool with at most 2 searches: 13,000 tokens, about 7 cents |
+| "Show me some Monet" showed a different painting from the one Claude named | Opening the gallery starts its seasonal collection loading. When Claude's search finished first, the slower seasonal image arrived later and covered the Monet. | Each `show()` call gets a sequence number, and an image that loads after a newer one was requested is dropped |
+| Claude channel couldn't be tested live from the cloud sandbox | The sandbox and the laptop's Cowork VM both block `api.anthropic.com` | Tested against a mock Claude in the sandbox, then live on the laptop through a remote session |
 | The local server stopped unexpectedly when started remotely | Process lifetime tied to the remote session | Use `start.bat`, which you run yourself |
 
 Testing used [`tests/run.js`](../tests/run.js). It steps through power-on, home, every weather segment, the fireplace and its sleep timer, and the gallery with its mat menu, plus a phone-sized viewport. It runs in two modes:
@@ -253,7 +262,7 @@ Both modes must finish with no page errors.
 |---|---|
 | Windows 10 or 11 | Any edition |
 | A modern browser | **Chrome or Edge** (recommended). Firefox works. The page uses ES modules, Web Audio, `speechSynthesis` and the Fullscreen API. |
-| A local web server | Needed because the browser won't load ES modules from `file://`. Any of these works: **Python 3** (`python -m http.server 8080`, which `start.bat` runs; install from python.org or the Microsoft Store), **Node.js** (`npx serve -l 8080`), or VS Code's **Live Server** extension. |
+| A local web server | Needed because the browser won't load ES modules from `file://`. **Python 3** runs `server.py` through `start.bat`, and that's required for Fog City Talk. For the other channels any static server works: **Python 3** (`python -m http.server 8080`; install from python.org or the Microsoft Store), **Node.js** (`npx serve -l 8080`), or VS Code's **Live Server** extension. |
 | Internet access | For live weather, radar, paintings and fonts. Without it, the TV still runs with sample weather and the local photo gallery. |
 | Speakers | For the jazz, the announcer and the crackle. Windows' built-in voices (for example Microsoft David or Zira) speak the announcer lines. |
 
@@ -269,13 +278,125 @@ Or skip all of that and **play it on GitHub Pages**. Nothing to install.
 | yt-dlp (`winget install yt-dlp`) | Only for studying reference videos |
 | A fal account (optional) | Only to regenerate the photoreal media |
 
+## 10. Fog City Talk: how the Claude channel works
+
+Fog City Talk puts Claude on the TV. You press **T** (or the red TALK button), speak or type, and Claude answers on screen and out loud. It can also run the TV: change channels, set the fireplace sleep timer, find paintings, change the volume and read the live forecast. Setup, security and cost for users are in [CLAUDE-CHANNEL.md](CLAUDE-CHANNEL.md). This section explains how it works inside.
+
+### 10.1 API, not subscription, and not Claude Code
+
+The channel calls the **Claude API** (the Messages API at `api.anthropic.com/v1/messages`) with an API key from the Claude Console. The key is billed per token, in a workspace that has its own monthly spend limit. Claude Code was only the tool that wrote the code. The Claude app subscription can't power a third-party app (section 1).
+
+### 10.2 The request path
+
+```
+ microphone --> browser speech recognition --> text
+                                               |
+ js/talk.js builds {system, messages, tools} --+--> POST /api/claude (server.py on the laptop,
+                                                    or the Cloudflare Worker for the public site)
+                                                         |
+                                  proxy adds the key, fixes model and limits
+                                                         |
+                                                         v
+                                             api.anthropic.com/v1/messages
+                                                         |
+ speechSynthesis <-- text blocks <-- js/talk.js <-- JSON response
+                                       |
+                                       +-- tool_use blocks --> run on the TV --> tool_result --> POST again
+```
+
+The page never has the key. It sends only what the conversation needs:
+
+```json
+{
+  "system": "You are the host of Fog City Talk ... Right now: <date and time> in San Francisco. The TV is on the gallery channel. On screen: \"Water Lilies\" by Claude Monet, 1906 ...",
+  "messages": [ {"role": "user", "content": "Who painted this?"} ],
+  "tools": [ {"name": "switch_channel", ...}, {"name": "set_sleep_timer", ...}, ... ]
+}
+```
+
+The proxy (`server.py` or `worker/worker.js`) checks the request and builds the real API call. The page doesn't choose any of these settings:
+
+| Field | Value | Why |
+|---|---|---|
+| `model` | `claude-opus-5-5` | Anthropic's current default model |
+| `max_tokens` | 2048 | Spoken answers are short. This is a hard cap per reply. |
+| `output_config.effort` | `low` | Less thinking, so faster and cheaper chat answers |
+| `tools` | the page's custom tools, plus `web_search_20250305` with `max_uses: 2` | Only custom tools are accepted from the page, so it can't add costly server tools |
+| `fallbacks` | `"default"` (beta `server-side-fallback-2026-07-01`) | If a safety classifier declines a request, the API retries it on a fallback model by itself |
+
+So even a modified page can't switch to a more expensive model or ask for longer answers.
+
+### 10.3 Tool use: how Claude runs the TV
+
+Claude can't touch the page. It can only *ask* for an action, and the page carries it out. Each tool is a name, a description and a JSON schema:
+
+| Tool | What the page does |
+|---|---|
+| `switch_channel {channel}` | `tvApp.go(channel)` |
+| `set_sleep_timer {minutes}` | Switches to the fireplace and calls its `setSleep(minutes)` |
+| `show_art {query}` | Switches to the gallery and searches the Art Institute of Chicago API, then returns the titles found so Claude can name them |
+| `set_volume {level, mute}` | Sets the shared Web Audio master gain |
+| `get_forecast {}` | Fetches the NWS forecast and alerts in Celsius and returns them as text |
+
+One exchange, as it ran in the live test:
+
+1. Page sends: *"Put on the fireplace, then say goodnight."*
+2. Claude replies with `stop_reason: "tool_use"` and one block, `tool_use switch_channel {"channel":"fireplace"}`. That reply used 471 input tokens and 53 output tokens.
+3. The page switches to the fireplace. It then adds Claude's whole reply to the conversation, adds a `tool_result` saying "Now on the fireplace channel", and sends the conversation again.
+4. Claude replies with `stop_reason: "end_turn"` and the goodnight text, which the page shows and speaks.
+
+The loop runs at most 6 rounds per question. Two rules keep it correct:
+
+- **The conversation is append-only.** Claude's full reply goes back unchanged, including its `thinking` blocks and search results. Current models check that earlier turns haven't been edited, so the page never rewrites history. It only starts fresh: when you press NEW, after about 20 exchanges, or after an error partway through a tool round.
+- **Every `stop_reason` is handled.** `tool_use` runs the tools. `pause_turn` (a long server-side search) sends the conversation back so Claude can continue. `refusal` shows a polite line and resets. `end_turn` speaks the answer. The answer can come split into several `text` blocks (it splits wherever search citations attach), so the page joins all of them.
+
+### 10.4 Web search
+
+`web_search` is a **server tool**. Anthropic runs the search during the same API call, and the results come back as `server_tool_use` and `web_search_tool_result` blocks next to the answer. The page only shows the text. A search costs $10 per 1,000 searches, plus the tokens of the results Claude reads.
+
+The first version used the newer `web_search_20260209`, which filters results by running code on Anthropic's side. One live news question then took 5 model turns, 4 code runs and 2 searches, and used **36,041 input tokens**, about 16 cents. The plain `web_search_20250305` with at most 2 searches answered the same question in 2 turns and 1 search with **13,413 input tokens**, about 7 cents. For one-sentence TV answers the filtering wasn't worth it, so the channel uses the plain tool.
+
+### 10.5 Voice
+
+- **Speech in:** the browser's Web Speech API (`SpeechRecognition`, which Chrome and Edge provide). The browser sends the audio to its own speech service (Google for Chrome, Microsoft for Edge) and returns text. Firefox doesn't support it, so the text box is always there.
+- **Speech out:** `speechSynthesis` with an installed English voice, the same engine as the weather announcer. Markdown and URLs are stripped before speaking, and the system prompt asks for plain spoken sentences.
+
+### 10.6 Keeping the key and the bill safe
+
+| Layer | Protection |
+|---|---|
+| Repository | The key isn't in it. `.anthropic_key`, `.env` and `.dev.vars` are git-ignored. `js/config.js` ships with no proxy address, so the public site shows **Off the air**. |
+| Local proxy (`server.py`) | Listens on 127.0.0.1 only. Refuses to serve dotfiles or its own source. Allows 300 requests a day. |
+| Public proxy (Worker) | The key is a Cloudflare secret. Only the site's own origin is accepted, plus a passcode. Optional daily cap stored in KV. |
+| Request shape | The proxy fixes the model, the effort and the token cap, and accepts only custom tools |
+| Console | A dedicated workspace with a monthly spend limit ($20) stops everything at a dollar ceiling. The promo credit expires 2026-11-11. |
+
+Measured costs: a TV command is under 2 cents, and a question that needs a web search is about 7 cents.
+
+### 10.7 How it was tested
+
+1. **Mock Claude in the sandbox.** A fake upstream returned a `tool_use` and then text. Playwright checked that the TV switched to the fireplace and showed the 30-minute timer. It also checked that typing H, M, T or F in the talk box doesn't trigger TV shortcuts, and that the request sent upstream had the right model, headers and tool list.
+2. **Worker logic in Node** with a mocked `fetch`: wrong origin gives 403, missing passcode gives 401, the daily cap gives 429, and the CORS preflight gives 204.
+3. **Live on the laptop.** The cloud sandbox can't reach `api.anthropic.com`, so the real calls ran on the laptop through `server.py`: a tool call, a web search question, then the comparison in 10.4.
+4. **Screenshots** of real answers were taken in a visible Edge window (the museum blocks headless browsers).
+
+| Weather advice | Painting search |
+|---|---|
+| ![What should I wear today?](screenshots/talk-weather.jpg) | ![Show me some Monet](screenshots/talk-art.jpg) |
+
+| Fireplace with sleep timer | Where to stream a show |
+|---|---|
+| ![Fireplace with a sleep timer](screenshots/talk-fireplace.jpg) | ![Where can I stream The Bear?](screenshots/talk-streaming.jpg) |
+
 ---
 
-## 10. Ideas for next steps
+## 11. Ideas for next steps
 
 - **Your own city.** Change `PLACE` in `js/util.js` and regenerate the six sky-cam states with the prompts in section 7.
 - **Live sky cam.** Swap the photos for a public webcam stream where its licence allows.
 - **Hourly forecast and a temperature graph segment** from the NWS `forecastHourly` endpoint.
 - **More museums.** Add Cleveland Museum of Art Open Access or the Met Open Access as more CC0 sources.
 - **A real TV.** Install the page as a PWA, or cast it to an Android TV or Chromecast in kiosk mode.
-- **Bring back the Claude channel** through a small serverless proxy that holds an API key with a monthly spend cap.
+- **Stream Claude's answers** so the first words appear and are spoken sooner.
+- **Let Claude see the painting** by sending the on-screen image with the question.
+- **A wake word**, so you can say "Hey Fog City" without pressing a button.
