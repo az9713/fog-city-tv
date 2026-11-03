@@ -4,7 +4,7 @@ Fog City Talk is a TV channel where you talk to Claude. Press **T** (or the red 
 
 It uses the **Claude API**, which is separate from the Claude chat app and from Claude Code. Each question is a paid API call, billed to the API key you set up below.
 
-![Fog City Talk](screenshots/talk.jpg)
+![Fog City Talk](screenshots/talk-weather.jpg)
 
 ## What it can do
 

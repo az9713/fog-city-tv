@@ -113,6 +113,7 @@ export class Gallery {
 
   show() {
     const w = this.works[this.idx]; if (!w) return;
+    const seq = this.showSeq = (this.showSeq || 0) + 1;   // a slower, older image must not land on top
     const [, matCol, gold] = MATS[this.s.mat];
     const pad = SIZES[this.s.size][1];
     const maxW = 1920 - 2 * pad - 160, maxH = 1080 - 2 * pad - 140;
@@ -127,6 +128,7 @@ export class Gallery {
     frame.appendChild(bevel);
     const layer = h('div', 'art'); layer.style.opacity = 0; layer.appendChild(frame);
     img.onload = () => {
+      if (seq !== this.showSeq) return;
       const old = this.artEl;
       this.el.insertBefore(layer, this.el.querySelector('.status'));
       requestAnimationFrame(() => { layer.style.opacity = 1; old.style.opacity = 0; });
@@ -135,7 +137,7 @@ export class Gallery {
       this.showCaption(w);
       store.set('artLast', { thumb: w.thumb });
     };
-    img.onerror = () => { this.works.splice(this.idx, 1); if (this.works.length) { this.idx %= this.works.length; this.show(); } };
+    img.onerror = () => { if (seq !== this.showSeq) return; this.works.splice(this.idx, 1); if (this.works.length) { this.idx %= this.works.length; this.show(); } };
     img.src = w.src;
     clearTimeout(this.changeTimer);
     const mins = CHANGE[this.s.change][1];

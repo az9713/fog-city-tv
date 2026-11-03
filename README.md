@@ -56,7 +56,15 @@ Public-domain paintings from the Art Institute of Chicago in a matted frame. It 
 
 Talk to Claude by voice or keyboard on any channel: press **T**. It answers on screen and out loud, and it can run the TV. It switches channels, sets the fireplace sleep timer, finds paintings, changes the volume, reads the live forecast and searches the web.
 
-![Fog City Talk](docs/screenshots/talk.jpg)
+| "What should I wear today?" | "Show me some Monet" |
+|---|---|
+| ![Weather advice](docs/screenshots/talk-weather.jpg) | ![Painting search](docs/screenshots/talk-art.jpg) |
+
+| "Put on the fireplace with a 30 minute sleep timer" | "Where can I stream The Bear?" |
+|---|---|
+| ![Fireplace with a sleep timer](docs/screenshots/talk-fireplace.jpg) | ![Where to stream a show](docs/screenshots/talk-streaming.jpg) |
+
+These are real answers from Claude, captured on the laptop. How the channel works inside (the API request, the proxy, tool use, web search and voice) is in [docs/JOURNEY.md, section 10](docs/JOURNEY.md#10-fog-city-talk-how-the-claude-channel-works).
 
 This channel uses the paid Claude API, so it needs your own API key. The key stays in a small proxy and is never in the page or this repo. On the public site the channel stays **off the air** unless you connect your own proxy. Setup, security and cost (under 2 cents for a TV command, about 7 cents for a question that needs a web search) are in **[docs/CLAUDE-CHANNEL.md](docs/CLAUDE-CHANNEL.md)**.
 
