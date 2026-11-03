@@ -69,7 +69,14 @@ The local server listens only on your own computer (127.0.0.1). It won't serve t
 
 ## Cost
 
-Claude Opus 5.5 costs $4 per million input tokens and $20 per million output tokens. A typical question with a spoken-length answer uses about 2,000 to 4,000 input tokens (instructions, tools and the conversation so far) and 100 to 400 output tokens. That's roughly **1 to 3 cents per question**. A web search adds $0.01 per search, and Claude does at most 3 per question. A long conversation gets slowly more expensive, because each question resends the earlier ones. Press **NEW** to start fresh, which also happens on its own after about 20 exchanges.
+Claude Opus 5.5 costs $4 per million input tokens and $20 per million output tokens. Measured on the real API:
+
+| Kind of question | Input tokens | Cost |
+|---|---|---|
+| TV command ("put on the fireplace") | about 500 to 3,000 | under 2 cents |
+| Question that needs a web search (news, streaming) | about 13,000 | about 7 cents, including $0.01 per search |
+
+Search results are long, and they make up most of the cost. Claude does at most 2 searches per question. A long conversation gets slowly more expensive, because each question resends the earlier ones. Press **NEW** to start fresh, which also happens on its own after about 20 exchanges.
 
 Your usage is listed in the Claude Console under Usage and Cost.
 

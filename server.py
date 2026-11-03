@@ -29,7 +29,8 @@ MODEL = "claude-opus-5-5"
 MAX_TOKENS = 2048
 EFFORT = "low"                      # short spoken answers: low effort is fast and cheap
 BETAS = "server-side-fallback-2026-07-01"
-WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 3}
+# Basic search: the dynamic-filtering variant (web_search_20260209) used ~2.7x the input tokens in a live test.
+WEB_SEARCH = {"type": "web_search_20250305", "name": "web_search", "max_uses": 2}
 MAX_BODY = 400_000
 
 

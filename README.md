@@ -58,7 +58,7 @@ Talk to Claude by voice or keyboard on any channel: press **T**. It answers on s
 
 ![Fog City Talk](docs/screenshots/talk.jpg)
 
-This channel uses the paid Claude API, so it needs your own API key. The key stays in a small proxy and is never in the page or this repo. On the public site the channel stays **off the air** unless you connect your own proxy. Setup, security and cost (about 1 to 3 cents per question) are in **[docs/CLAUDE-CHANNEL.md](docs/CLAUDE-CHANNEL.md)**.
+This channel uses the paid Claude API, so it needs your own API key. The key stays in a small proxy and is never in the page or this repo. On the public site the channel stays **off the air** unless you connect your own proxy. Setup, security and cost (under 2 cents for a TV command, about 7 cents for a question that needs a web search) are in **[docs/CLAUDE-CHANNEL.md](docs/CLAUDE-CHANNEL.md)**.
 
 ---
 
