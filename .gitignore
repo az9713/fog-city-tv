@@ -5,3 +5,5 @@ tests/shots_off/
 .env
 .dev.vars
 __pycache__/
+.talk_passcode
+.wrangler/

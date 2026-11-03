@@ -1,0 +1,15 @@
+# Deploy with: npx wrangler deploy   (run inside this folder)
+# Secrets are NOT stored here. Set them with:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put PASSCODE
+name = "fog-city-talk"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://az9713.github.io"
+DAILY_LIMIT = "200"
+
+[[kv_namespaces]]
+binding = "USAGE"
+id = "4f1c916e0d394bd4b7152cbfcce9f1f5"

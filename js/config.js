@@ -4,5 +4,5 @@
 // When the page is served by server.py on localhost, the local proxy at /api/claude is used.
 // The address is not a secret: the Worker also requires a passcode and only accepts calls from your site.
 export const TALK = {
-  proxy: '',
+  proxy: 'https://fog-city-talk.az9713.workers.dev',
 };
